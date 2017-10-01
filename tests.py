@@ -41,19 +41,19 @@ TEST_RECORD = {
 
 
 def test_s3_files():
-    data = dict(Records=[TEST_RECORD.copy()])
-    objs = list(s3_files(data))
+    event = dict(Records=[TEST_RECORD.copy()])
+    objs = list(s3_files(event))
     assert len(objs) == 1
     assert objs[0].bucket_name == 'sourcebucket'
     assert objs[0].key == 'HappyFace.jpg'
     # add another record, check we're getting multiple
-    data['Records'].append(TEST_RECORD.copy())
-    assert len(data['Records']) == 2
-    objs = list(s3_files(data))
+    event['Records'].append(TEST_RECORD.copy())
+    assert len(event['Records']) == 2
+    objs = list(s3_files(event))
     assert len(objs) == 2
     # check that non PUT events are ignored
-    data['Records'][0]['eventName'] = 'foo'
-    objs = list(s3_files(data))
+    event['Records'][0]['eventName'] = 'foo'
+    objs = list(s3_files(event))
     assert len(objs) == 1
 
 
@@ -67,14 +67,15 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_connect):
     mock_transport = paramiko.Transport(None)
     mock_connect.return_value = (mock_client, mock_transport)
 
-    data = dict(Records=[TEST_RECORD.copy()])
-    on_trigger_event(data, {})
+    event = dict(Records=[TEST_RECORD.copy()])
+    context = mock.Mock()
+    on_trigger_event(event, context)
     assert mock_transfer.call_count == 1
     assert mock_delete.call_count == 1
     # check that a failure in transfer means delete is not called
-    mock_transfer.side_effect = Exception("Error transferring file")
     mock_transfer.reset_mock()
     mock_delete.reset_mock()
-    on_trigger_event(data, {})
+    mock_transfer.side_effect = Exception("Error transferring file")
+    on_trigger_event(event, context)
     assert mock_transfer.call_count == 1
     assert mock_delete.call_count == 0

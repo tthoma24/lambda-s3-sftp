@@ -1,6 +1,5 @@
 """
-AWS Lambda function for transferring files from S3 to SFTP on a
-PUT event (i.e. new files).
+AWS Lambda function for transferring files from S3 to SFTP on a PUT event.
 
 Required env vars:
 
@@ -11,8 +10,8 @@ Required env vars:
 
 Optional env vars
 
-    SSH_DIR - if specified the SFTP client will chdir into this directory
-              prior to transferring the file across.
+    SSH_DIR - if specified the SFTP client will transfer the files to the
+        specified directory.
 
 """
 import logging
@@ -26,7 +25,29 @@ logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
 
 
 def on_trigger_event(event, context):
-    """Move uploaded S3 files to SFTP endpoint, then delete."""
+    """
+    Move uploaded S3 files to SFTP endpoint, then delete.
+
+    This is the Lambda entry point. It receives the event
+    payload and processes it. In this case it receives a
+    set of 'Record' dicts which should contain details of
+    an S3 file PUT. The contents of this dict can be found
+    in the tests.py::TEST_RECORD - the example comes from
+    the Lambda test event rig.
+
+    The only important information we process in this function
+    are the `eventName` which must be ObjectCreated:Put, and
+    then the bucket name and object key.
+
+    This function then connects to the SFTP server, copies
+    the file across, and then (if successful), deletes the
+    original. This is done to prevent sensitive data from
+    hanging around - it basically only exists for as long
+    as it takes Lambda to pick it up and transfer it.
+
+    See http://docs.aws.amazon.com/lambda/latest/dg/python-programming-model-handler-types.html
+
+    """
     sftp_client, transport = connect_to_sftp()
     with transport:
         for s3_file in s3_files(event):
