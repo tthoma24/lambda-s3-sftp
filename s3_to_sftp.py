@@ -25,6 +25,7 @@ logger = logging.getLogger()
 logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
 
 
+# This is the Lambda entrypoint
 def on_trigger(event, context):
     """Open SFTP connection and transfer S3 file across on PUT trigger."""
     transport = get_transport()
