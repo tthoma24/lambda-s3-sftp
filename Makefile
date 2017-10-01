@@ -3,10 +3,10 @@
 # the make commands by mounting this directory into the container as
 # /lambda:
 #
-#     $ docker run -v $(pwd):/lambda yunojuno/amazonlinux-lambda-python3 lambda
+#     $ docker run --rm -v $(pwd):/lambda yunojuno/amazonlinux-lambda-python3 package
 #
 install:
-	pip install -r requirements.txt
+	pip3 install -r requirements.txt
 
 package: install
 	mkdir -p dist
