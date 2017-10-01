@@ -32,24 +32,27 @@ def on_trigger_event(event, context):
     sftp_client = get_sftp_client(transport)
     # context manager handles connection close / cleanup
     with transport:
-        for record in event['Records']:
-            bucket, key = get_bucket_key(record)
+        for s3_file in s3_files(event):
             try:
-                transfer_file(sftp_client, bucket, key)
-                delete_file(bucket, key)
+                transfer_file(sftp_client, s3_file)
+                delete_file(s3_file)
             except Exception:
-                logger.exception("Error processing file '%s'", key)
+                logger.exception("Error processing '%s'", s3_file.key)
 
 
-def get_bucket_key(record):
-    """Parse bucket, key from S3 PUT trigger record."""
-    bucket = record['s3']['bucket']['name']
-    key = record['s3']['object']['key']
-    return bucket, key
+def s3_files(event):
+    """Generator yielding Boto3.Objects for each PUT file in event dict."""
+    for record in event['Records']:
+        bucket = record['s3']['bucket']['name']
+        key = record['s3']['object']['key']
+        if record['eventName'] == "ObjectCreated:Put":
+            yield boto3.resource('s3').Object(bucket, key)
+        else:
+            logger.warning("Ignoring invalid event: %s", record)
 
 
 def get_transport():
-    """Return a connected Transport object."""
+    """Return a connected Transport object configured from env vars."""
     hostname = os.environ['SSH_HOST']
     port = int(os.environ['SSH_PORT'])
     username = os.environ['SSH_USERNAME']
@@ -67,23 +70,15 @@ def get_sftp_client(transport):
     return client
 
 
-def transfer_file(sftp_client, bucket, key):
-    """
-    Download file from S3 and upload to SFTP
-    """
-    filename = key.split('/')[-1]
-    s3_client = boto3.client('s3')
+def transfer_file(sftp_client, s3_file):
+    """Download file from S3 and upload directly to SFTP."""
+    filename = s3_file.key.split('/')[-1]
     with sftp_client.file(filename, 'w') as sftp_file:
-        s3_client.download_fileobj(
-            Bucket=bucket,
-            Key=key,
-            Fileobj=sftp_file
-        )
-    logger.info("Transferred '%s' from S3 to SFTP", key)
+        s3_file.download_fileobj(Fileobj=sftp_file)
+    logger.info("Transferred '%s' from S3 to SFTP", s3_file.key)
 
 
-def delete_file(bucket, key):
+def delete_file(s3_file):
     """Delete S3 file."""
-    s3_object = boto3.resource('s3').Object(bucket, key)
-    s3_object.delete()
-    logger.info("Deleted '%s' from S3", key)
+    s3_file.delete()
+    logger.info("Deleted '%s' from S3", s3_file.key)
