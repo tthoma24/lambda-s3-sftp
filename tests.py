@@ -1,6 +1,8 @@
 from unittest import mock
 from s3_to_sftp import *
 
+import paramiko
+
 # taken directly from the Lambda test configuration
 TEST_RECORD = {
     "eventVersion": "2.0",
@@ -55,11 +57,16 @@ def test_s3_files():
     assert len(objs) == 1
 
 
-@mock.patch('s3_to_sftp.get_transport')
-@mock.patch('s3_to_sftp.get_sftp_client')
+@mock.patch('s3_to_sftp.connect_to_sftp')
 @mock.patch('s3_to_sftp.transfer_file')
 @mock.patch('s3_to_sftp.delete_file')
-def test_on_trigger_event(mock_delete, mock_transfer, mock_sftp, mock_transport):
+def test_on_trigger_event(mock_delete, mock_transfer, mock_connect):
+
+    # lots of mocks to remove the paramiko SSH connection internals
+    mock_client = mock.Mock(spec=paramiko.SFTPClient)
+    mock_transport = paramiko.Transport(None)
+    mock_connect.return_value = (mock_client, mock_transport)
+
     data = dict(Records=[TEST_RECORD.copy()])
     on_trigger_event(data, {})
     assert mock_transfer.call_count == 1

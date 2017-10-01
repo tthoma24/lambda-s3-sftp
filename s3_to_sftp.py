@@ -25,12 +25,9 @@ logger = logging.getLogger()
 logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
 
 
-# This is the Lambda entrypoint
 def on_trigger_event(event, context):
-    """Open SFTP connection and transfer S3 file across on PUT trigger."""
-    transport = get_transport()
-    sftp_client = get_sftp_client(transport)
-    # context manager handles connection close / cleanup
+    """Move uploaded S3 files to SFTP endpoint, then delete."""
+    sftp_client, transport = connect_to_sftp()
     with transport:
         for s3_file in s3_files(event):
             try:
@@ -38,6 +35,28 @@ def on_trigger_event(event, context):
                 delete_file(s3_file)
             except Exception:
                 logger.exception("Error processing '%s'", s3_file.key)
+
+
+def connect_to_sftp():
+    """
+    Connect to SFTP endpoint.
+
+    Use env vars to connect to the SFTP endpoint.
+
+    Returns a 2-tuple containing paramiko (SFTPClient, Transport)
+        objects, connected to the configured endpoint.
+
+    """
+    hostname = os.environ['SSH_HOST']
+    port = int(os.environ['SSH_PORT'])
+    username = os.environ['SSH_USERNAME']
+    password = os.environ['SSH_PASSWORD']
+    transport = paramiko.Transport((hostname, port))
+    transport.connect(username=username, password=password)
+    client = paramiko.SFTPClient.from_transport(transport)
+    if os.getenv('SSH_DIR'):
+        client.chdir(os.getenv('SSH_DIR'))
+    return client, transport
 
 
 def s3_files(event):
@@ -49,25 +68,6 @@ def s3_files(event):
             yield boto3.resource('s3').Object(bucket, key)
         else:
             logger.warning("Ignoring invalid event: %s", record)
-
-
-def get_transport():
-    """Return a connected Transport object configured from env vars."""
-    hostname = os.environ['SSH_HOST']
-    port = int(os.environ['SSH_PORT'])
-    username = os.environ['SSH_USERNAME']
-    password = os.environ['SSH_PASSWORD']
-    transport = paramiko.Transport((hostname, port))
-    transport.connect(username=username, password=password)
-    return transport
-
-
-def get_sftp_client(transport):
-    """Return an SFTP client, chdir to SSH_DIR if specified."""
-    client = paramiko.SFTPClient.from_transport(transport)
-    if os.getenv('SSH_DIR'):
-        client.chdir(os.getenv('SSH_DIR'))
-    return client
 
 
 def transfer_file(sftp_client, s3_file):
