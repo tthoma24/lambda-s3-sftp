@@ -37,7 +37,9 @@ The `package` make command does the following, inside the new, clean, container:
 3. Copy all the dependencies installed into a `/dist` directory, along with the `s3_to_sftp.py` source
 4. Zip up the directory into a new file called `package.zip`
 
-3. Upload `package.zip` to AWS through the Lambda interface.
+3. Upload `package.zip` to AWS through the Lambda interface:
+
+<img src="screenshots/lambda-configuration.png" />
 
 Configuration
 -------------
