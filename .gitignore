@@ -5,3 +5,5 @@ package.zip
 *.pyc
 lambda
 package
+.venv
+.cache

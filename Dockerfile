@@ -30,13 +30,9 @@ RUN wget https://www.python.org/ftp/python/3.6.0/Python-3.6.0.tar.xz && \
 
     cd .. && \
     rm Python-3.6.0.tar.xz && \
-    rm -rf Python-3.6.0
+    rm -rf Python-3.6.0 && \
 
-# Create and activate a virtualenv, so we isolate the project libs
-RUN pip3 install pip-tools virtualenv && \
-    virtualenv -p python3 /.venv/lambda && \
-    source /.venv/lambda/bin/activate && \
-    echo 'source /.venv/lambda/bin/activate' >> ~/.bashrc
+    pip3 install pip-tools virtualenv
 
 VOLUME ["/lambda"]
 WORKDIR "/lambda"

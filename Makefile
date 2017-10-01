@@ -1,24 +1,28 @@
 # This Makefile is designed to be run from within a docker container
-# based on the yunojuno/amazonlinux-lambda-python3 image. You can run
-# the make commands by mounting this directory into the container as
-# /lambda:
+# based on the Dockerfile in this project. You can run the make commands
+# by mounting this directory into the container as /lambda:
 #
-#     $ docker run --rm -v $(pwd):/lambda yunojuno/amazonlinux-lambda-python3 package
+# 	 $ cd path/to/this/project
+#    $ docker build -t packager .
+#    $ docker run --rm -v $(pwd):/lambda packager [package|compile]
 #
-install:
-	pip3 install -r requirements.txt
+clean:
+	rm -rf .venv
+	rm -rf dist/
+	rm -f package.zip
 
-package: install
+install:
+	virtualenv -p python3 .venv
+	# must run on same line to ensure virtualenv is active
+	source .venv/bin/activate &&  pip3 install -r requirements.txt
+
+package: clean install
 	mkdir -p dist
 	cp *.py dist/
-	cp -r /.venv/lambda/lib/python3.6/site-packages/. dist/
+	cp -r .venv/lib/python3.6/site-packages/. dist/
 	cd dist; zip -r ../package.zip .
 
-clean:
-	rm -rf dist/
-	rm package.zip
-
 compile:
-	# compile the set of requirements
+	# compile the set of requirements from requirements.in to requirements.txt
 	# must set locale, see http://click.pocoo.org/5/python3/ for details
 	LC_ALL=en_US.utf8 pip-compile --output-file requirements.txt requirements.in
