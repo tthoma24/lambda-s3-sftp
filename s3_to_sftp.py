@@ -26,7 +26,7 @@ logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
 
 
 # This is the Lambda entrypoint
-def on_trigger(event, context):
+def on_trigger_event(event, context):
     """Open SFTP connection and transfer S3 file across on PUT trigger."""
     transport = get_transport()
     sftp_client = get_sftp_client(transport)
@@ -34,7 +34,11 @@ def on_trigger(event, context):
     with transport:
         for record in event['Records']:
             bucket, key = get_bucket_key(record)
-            transfer_file(sftp_client, bucket, key)
+            try:
+                transfer_file(sftp_client, bucket, key)
+                delete_file(bucket, key)
+            except Exception:
+                logger.exception("Error processing file '%s'", key)
 
 
 def get_bucket_key(record):
@@ -70,13 +74,16 @@ def transfer_file(sftp_client, bucket, key):
     filename = key.split('/')[-1]
     s3_client = boto3.client('s3')
     with sftp_client.file(filename, 'w') as sftp_file:
-        try:
-            s3_client.download_fileobj(
-                Bucket=bucket,
-                Key=key,
-                Fileobj=sftp_file
-            )
-        except Exception:
-            logger.exception("Error uploading '%s' to SFTP", filename)
-        else:
-            logger.info("Successfully uploaded '%s' to SFTP", filename)
+        s3_client.download_fileobj(
+            Bucket=bucket,
+            Key=key,
+            Fileobj=sftp_file
+        )
+    logger.info("Transferred '%s' from S3 to SFTP", key)
+
+
+def delete_file(bucket, key):
+    """Delete S3 file."""
+    s3_object = boto3.resource('s3').Object(bucket, key)
+    s3_object.delete()
+    logger.info("Deleted '%s' from S3", key)
