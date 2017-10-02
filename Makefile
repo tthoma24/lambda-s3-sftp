@@ -26,7 +26,7 @@ install:
 # zip up the contents of the virtualenv site-packages and py scripts
 package: clean install
 	mkdir -p dist
-	cp *.py dist/
+	cp s3_to_sftp.py dist/
 	cp -r .venv/lib/python3.6/site-packages/. dist/
 	# package.zip is the file to upload to Lambda
 	cd dist; zip -r ../package.zip .

@@ -47,6 +47,10 @@ def on_trigger_event(event, context):
 
     See http://docs.aws.amazon.com/lambda/latest/dg/python-programming-model-handler-types.html
 
+    Args:
+        event: dict, the event payload delivered by Lambda.
+        context: a LambdaContext object - unused.
+
     """
     sftp_client, transport = connect_to_sftp()
     with transport:
@@ -63,7 +67,9 @@ def connect_to_sftp():
     """
     Connect to SFTP endpoint.
 
-    Use env vars to connect to the SFTP endpoint.
+    Use env vars to connect to the SFTP endpoint, and return a connected
+    client object, as well as the Transport object, which can be used as
+    a context manager.
 
     Returns a 2-tuple containing paramiko (SFTPClient, Transport)
         objects, connected to the configured endpoint.
@@ -85,7 +91,18 @@ def connect_to_sftp():
 
 
 def s3_files(event):
-    """Generator yielding Boto3.Objects for each PUT file in event dict."""
+    """
+    Iterate through event and yield boto3.Object for each S3 file PUT.
+
+    This function loops through all the records in the payload,
+    checks that the event is a file PUT, and if so, yields a
+    boto3.Object that represents the file.
+
+    Args:
+        event: dict, the payload received from the Lambda trigger.
+            See tests.py::TEST_RECORD for a sample.
+
+    """
     for record in event['Records']:
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key']
@@ -96,7 +113,14 @@ def s3_files(event):
 
 
 def transfer_file(sftp_client, s3_file):
-    """Download file from S3 and upload directly to SFTP."""
+    """
+    Transfer S3 file to SFTP server.
+
+    Args:
+        sftp_client: paramiko.SFTPClient, connected to SFTP endpoint
+        s3_file: boto3.Object representing the S3 file
+
+    """
     filename = s3_file.key.split('/')[-1]
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
@@ -104,6 +128,16 @@ def transfer_file(sftp_client, s3_file):
 
 
 def delete_file(s3_file):
-    """Delete S3 file."""
+    """
+    Delete file from S3.
+
+    This is only a one-liner, but it's pulled out into its own function
+    to make it easier to mock in tests, and to make the trigger
+    function easier to read.
+
+    Args:
+        s3_file: boto3.Object representing the S3 file
+
+    """
     s3_file.delete()
     logger.info("Deleted '%s' from S3", s3_file.key)

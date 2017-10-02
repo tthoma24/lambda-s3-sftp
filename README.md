@@ -1,13 +1,21 @@
 S3 to SFTP AWS Lambda function
 ==============================
 
-This is a simple single-purpose Lambda function, written in Python3, that will transfer a file from S3 to an SFTP server, triggered by a Lambda `ObjectPut:New` event.
+This is a simple single-purpose Lambda function, written in Python3, that will transfer a file from S3 to an SFTP server, on upload to S3. If the file transfer from S3 to SFTP is successful, the source S3 file is deleted.
 
-This project contains the source code and packaging instructions for an AWS Lambda function written in Python3 that will transfer a file from S3 to and SFTP server. The function itself is very simple, and is contained in `s3_to_sftp.py`. It should be self-explanatory for anyone familiar with Python.
+This project contains the source code for the function along with packaging instructions for preparing the function and its dependencies for upload to AWS. The function itself is very simple, and is contained in `s3_to_sftp.py`. It should be self-explanatory for anyone familiar with Python.
 
-**Limitations**
+**Status**
 
 The function currently uses username/password to connect to the remote SFTP, and does not support public key authentication.
+
+**Tests**
+
+There are tests in the `tests.py` file, which can be run using `pytest`:
+
+```shell
+$ pytest tests.py
+```
 
 Packaging and Deployment
 ------------------------
@@ -29,19 +37,19 @@ $ docker build -t packager .
 2. Use the image created to run the `Makefile`:
 
 ```shell
-$ docker run --rm --volume $(pwd):/lambda packager
+$ docker run --rm --volume $(pwd):/lambda packager package
 ```
 
 This command will mount the current directory (`$(pwd)`) into a new container as `/lambda`, and run the `make package` command.
 
 The `package` make command does the following, inside the new, clean, container:
 
-1. Create and activate a new virtualenv using python3
-2. Install all of the requirements specified in `requirements.txt`
-3. Copy all the dependencies installed into a `/dist` directory, along with the `s3_to_sftp.py` source
-4. Zip up the directory into a new file called `package.zip`
+* Create and activate a new virtualenv using python3
+* Install all of the requirements specified in `requirements.txt`
+* Copy all the dependencies installed into a `/dist` directory, along with the `s3_to_sftp.py` source
+* Zip up the directory into a new file called `package.zip`
 
-3. Upload `package.zip` to AWS through the Lambda interface:
+3. Once you have generated the `package.zip`, you can upload it to AWS:
 
 <img src="screenshots/lambda-configuration.png" />
 
