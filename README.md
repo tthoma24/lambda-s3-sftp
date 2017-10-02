@@ -1,9 +1,13 @@
-S3 to SFTP
-==========
+S3 to SFTP AWS Lambda function
+==============================
 
-Send an S3 file, whenever it is uploaded, to a remote server using SFTP
+This is a simple single-purpose Lambda function, written in Python3, that will transfer a file from S3 to an SFTP server, triggered by a Lambda `ObjectPut:New` event.
 
 This project contains the source code and packaging instructions for an AWS Lambda function written in Python3 that will transfer a file from S3 to and SFTP server. The function itself is very simple, and is contained in `s3_to_sftp.py`. It should be self-explanatory for anyone familiar with Python.
+
+**Limitations**
+
+The function currently uses username/password to connect to the remote SFTP, and does not support public key authentication.
 
 Packaging and Deployment
 ------------------------
