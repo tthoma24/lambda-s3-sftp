@@ -51,6 +51,7 @@ def on_trigger_event(event, context):
     sftp_client, transport = connect_to_sftp()
     with transport:
         for s3_file in s3_files(event):
+            logger.debug("Transferring '%s' from S3 to SFTP", s3_file.key)
             try:
                 transfer_file(sftp_client, s3_file)
                 delete_file(s3_file)
@@ -72,11 +73,14 @@ def connect_to_sftp():
     port = int(os.environ['SSH_PORT'])
     username = os.environ['SSH_USERNAME']
     password = os.environ['SSH_PASSWORD']
+    ssh_dir = os.getenv('SSH_DIR')
     transport = paramiko.Transport((hostname, port))
     transport.connect(username=username, password=password)
     client = paramiko.SFTPClient.from_transport(transport)
-    if os.getenv('SSH_DIR'):
-        client.chdir(os.getenv('SSH_DIR'))
+    logger.debug("Connected to remote SFTP server")
+    if ssh_dir:
+        client.chdir(ssh_dir)
+        logger.debug("Switched into remote SFTP upload directory")
     return client, transport
 
 
