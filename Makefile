@@ -10,26 +10,16 @@
 # file that contains everything required to run the Lambda function. This
 # should be uploaded to AWS.
 #
-# restore local file system to pre-packaging state, clear out the
-# virtualenv and dist folder and remove any existing package.zip
+# restore local file system to pre-packaging state
 clean:
-	rm -rf .venv
-	rm -rf dist/
+	rm -rf .dist/
 	rm -f package.zip
 
-# create a new virtualenv and install project requirements into it
-install:
-	virtualenv -p python3 .venv
-	# must run on same line to ensure virtualenv is active
-	source .venv/bin/activate &&  pip3 install -r requirements.txt
-
-# zip up the contents of the virtualenv site-packages and py scripts
-package: clean install
-	mkdir -p dist
-	cp s3_to_sftp.py dist/
-	cp -r .venv/lib/python3.6/site-packages/. dist/
-	# package.zip is the file to upload to Lambda
-	cd dist; zip -r ../package.zip .
+package: clean
+	pip3 install -r requirements.txt -t .dist
+	cp *.py .dist/
+	cd .dist; zip -r ../package.zip .
+	rm -rf .dist/
 
 # run pip-compile to re-generate the requirements.txt file
 compile:
