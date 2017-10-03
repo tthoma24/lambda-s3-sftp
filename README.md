@@ -20,33 +20,33 @@ $ pytest tests.py
 Packaging and Deployment
 ------------------------
 
-Deploying this function to Lambda involves uploaded a zip file that contains the source code and all of the project dependencies (as specified in `requirements.txt`). The tricky part is that Lambda functions run inside an AmazonLinux environment, and that means that Python dependencies need to be generated / built within the same. The brute force approach to this would be to create an AmazonLinux EC2 instance and package up the project there, but this is hard to do, and impractical during development. A simpler solution is provided by the `Dockerfile` in the project.
+Deploying this function to Lambda involves uploaded a zip file that contains the source code and all of the project dependencies (as specified in `requirements.txt`). The tricky part is that Lambda functions run inside an AmazonLinux environment, and that means that Python dependencies need to be generated / built within the same. The brute force approach to this would be to create an AmazonLinux EC2 instance and package up the project there, but this is hard to do, and impractical during development. A simpler solution is provided by the `Dockerfile` in this project.
 
 These instructions assume that you have Docker installed.
 
 1. Build the packaging image
 
-The default amazonlinux:latest docker image provided by Amazon has Python2.7 installed - which is not what we are using. In order to support Python3 development we have to create a new image of the base image that has Python3, and a couple of extra tools that make packaging possible (principally `pip-tools` and `virtualenv`).
+The default `amazonlinux:latest` docker image provided by Amazon has Python2.7 installed - which is not what we are using. In order to support Python3 development we have to create a new image off the base image that has Python3.
 
 Create the new image and give it a sensible name using the `-t` option:
 
 ```shell
-$ docker build -t packager .
+$ docker build -t lambda-packager .
 ```
 
 2. Use the image created to run the `Makefile`:
 
 ```shell
-$ docker run --rm --volume $(pwd):/lambda packager package
+$ docker run --rm --volume $(pwd):/lambda lambda-packager package
 ```
 
-This command will mount the current directory (`$(pwd)`) into a new container as `/lambda`, and run the `make package` command.
+This command will mount the current directory (`$(pwd)`) into a new container as `/lambda`, so that the container has access to `requirements.txt` and the function file (`s3_to_sftp.py`), and run the `make package` command.
 
-The `package` make command does the following, inside the new, clean, container:
+The `package` make command does the following, inside the container:
 
 * Create and activate a new virtualenv using python3
-* Install all of the requirements specified in `requirements.txt`
-* Copy all the dependencies installed into a `/dist` directory, along with the `s3_to_sftp.py` source
+* Install all of the requirements into /lambda/.dist
+* Copy `s3_to_sftp.py` source file into /lambda/.dist
 * Zip up the directory into a new file called `package.zip`
 
 3. Once you have generated the `package.zip`, you can upload it to AWS:
