@@ -1,5 +1,5 @@
-S3 to SFTP AWS Lambda function
-==============================
+S3 to SFTP Transfer Function
+============================
 
 This is a simple single-purpose Lambda function, written in Python3, that will transfer a file from S3 to an SFTP server, on upload to S3. If the file transfer from S3 to SFTP is successful, the source S3 file is deleted.
 
@@ -52,7 +52,9 @@ The `package` make command does the following, inside the container:
 via the console (see screenshot below), or using the `make upload` command,
 using the function ARN:
 
-    $ make update ARN=arn:aws:lambda:us-east-1:account-id:function:s3-to-sftp
+```
+$ make update ARN=arn:aws:lambda:us-east-1:account-id:function:s3-to-sftp
+```
 
 <img src="screenshots/lambda-configuration.png" />
 
@@ -64,7 +66,7 @@ The following environment variables MUST be set:
     SSH_HOST - the host address of the destination SFTP server
     SSH_USERNAME - the SSH account username
     SSH_PASSWORD - the SSH account password, OR
-    SSH_PRIVATE_KEY - path to a private key file, in 'bucket:key' format
+    SSH_PRIVATE_KEY - path to a private key file on S3, in 'bucket:key' format
 
 The following environment variables MAY be set:
 
