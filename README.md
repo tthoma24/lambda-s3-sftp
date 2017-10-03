@@ -44,9 +44,8 @@ This command will mount the current directory (`$(pwd)`) into a new container as
 
 The `package` make command does the following, inside the container:
 
-* Create and activate a new virtualenv using python3
-* Install all of the requirements into /lambda/.dist
-* Copy `s3_to_sftp.py` source file into /lambda/.dist
+* `pip install` the requirements into `/lambda/.dist`
+* Copy `s3_to_sftp.py` source file into `/lambda/.dist`
 * Zip up the directory into a new file called `package.zip`
 
 3. Once you have generated the `package.zip`, you can upload it to AWS:
