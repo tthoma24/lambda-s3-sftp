@@ -4,17 +4,18 @@ AWS Lambda function for transferring files from S3 to SFTP on a PUT event.
 Required env vars:
 
     SSH_HOSTNAME
-    SSH_PORT
     SSH_USERNAME
-    SSH_PASSWORD
+    SSH_PASSWORD or SSH_PRIVATE_KEY (S3 file path in 'bucket:key' format)
 
 Optional env vars
 
+    SSH_PORT - defaults to 22
     SSH_DIR - if specified the SFTP client will transfer the files to the
         specified directory.
 
 """
 import logging
+import io
 import os
 
 import boto3
@@ -22,6 +23,17 @@ import paramiko
 
 logger = logging.getLogger()
 logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
+
+# read in shared properties on module load - will fail hard if any are missing
+SSH_HOST = os.environ['SSH_HOST']
+SSH_PORT = int(os.getenv('SSH_PORT', 22))
+SSH_USERNAME = os.environ['SSH_USERNAME']
+SSH_PASSWORD = os.getenv('SSH_PASSWORD')
+SSH_PRIVATE_KEY = os.getenv('SSH_PRIVATE_KEY')
+SSH_DIR = os.getenv('SSH_DIR')
+
+# fail hard on startup if no authentication mechanism exists
+assert SSH_PASSWORD or SSH_PRIVATE_KEY, "Missing SSH_PASSWORD or SSH_PRIVATE_KEY"
 
 
 def on_trigger_event(event, context):
@@ -52,7 +64,22 @@ def on_trigger_event(event, context):
         context: a LambdaContext object - unused.
 
     """
-    sftp_client, transport = connect_to_sftp()
+    if SSH_PRIVATE_KEY:
+        key_obj = get_private_key(*SSH_PRIVATE_KEY.split(':'))
+    else:
+        key_obj = None
+
+    sftp_client, transport = connect_to_sftp(
+        hostname=SSH_HOST,
+        port=SSH_PORT,
+        username=SSH_USERNAME,
+        password=SSH_PASSWORD,
+        pkey=key_obj
+    )
+    if SSH_DIR:
+        sftp_client.chdir(SSH_DIR)
+        logger.debug("Switched into remote SFTP upload directory")
+
     with transport:
         for s3_file in s3_files(event):
             logger.debug("Transferring '%s' from S3 to SFTP", s3_file.key)
@@ -63,31 +90,27 @@ def on_trigger_event(event, context):
                 logger.exception("Error processing '%s'", s3_file.key)
 
 
-def connect_to_sftp():
-    """
-    Connect to SFTP endpoint.
-
-    Use env vars to connect to the SFTP endpoint, and return a connected
-    client object, as well as the Transport object, which can be used as
-    a context manager.
-
-    Returns a 2-tuple containing paramiko (SFTPClient, Transport)
-        objects, connected to the configured endpoint.
-
-    """
-    hostname = os.environ['SSH_HOST']
-    port = int(os.environ['SSH_PORT'])
-    username = os.environ['SSH_USERNAME']
-    password = os.environ['SSH_PASSWORD']
-    ssh_dir = os.getenv('SSH_DIR')
+def connect_to_sftp(hostname, port, username, password, pkey):
+    """Connect to SFTP server and return client object."""
     transport = paramiko.Transport((hostname, port))
-    transport.connect(username=username, password=password)
+    transport.connect(username=username, password=password, pkey=pkey)
     client = paramiko.SFTPClient.from_transport(transport)
     logger.debug("Connected to remote SFTP server")
-    if ssh_dir:
-        client.chdir(ssh_dir)
-        logger.debug("Switched into remote SFTP upload directory")
     return client, transport
+
+
+def get_private_key(bucket, key):
+    """
+    Return an RSAKey object from a private key stored on S3.
+
+    It will fail hard if the key cannot be read, or is invalid.
+
+    """
+    key_obj = boto3.resource('s3').Object(bucket, key)
+    key_str = key_obj.get()['Body'].read().decode('utf-8')
+    key = paramiko.RSAKey.from_private_key(io.StringIO(key_str))
+    logger.debug("Retrieved private key from S3")
+    return key
 
 
 def s3_files(event):

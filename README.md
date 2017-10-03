@@ -5,9 +5,9 @@ This is a simple single-purpose Lambda function, written in Python3, that will t
 
 This project contains the source code for the function along with packaging instructions for preparing the function and its dependencies for upload to AWS. The function itself is very simple, and is contained in `s3_to_sftp.py`. It should be self-explanatory for anyone familiar with Python.
 
-**Status**
+**SFTP Authentication**
 
-The function currently uses username/password to connect to the remote SFTP, and does not support private key authentication. Paramiko does support it, so it wouldn't be hard to add support if required.
+The function supports authentication against the remote SFTP server using a username and either a password or a private key. If authenticating using a private key file then the file should be stored in a secure S3 bucket to which the IAM role under which the function is running has read access.
 
 **Tests**
 
@@ -58,10 +58,11 @@ Configuration
 The following environment variables MUST be set:
 
     SSH_HOST - the host address of the destination SFTP server
-    SSH_PORT - the port number (NB this must be set, there is no default)
     SSH_USERNAME - the SSH account username
-    SSH_PASSWORD - the SSH account password
+    SSH_PASSWORD - the SSH account password, OR
+    SSH_PRIVATE_KEY - path to a private key file, in 'bucket:key' format
 
 The following environment variables MAY be set:
 
-    SSH_DIR - if set, the files will be uploaded to the specified SFTP directory
+    SSH_PORT - the port number (defaults to 22)
+    SSH_DIR - if set, the files will be uploaded to the specified directory
