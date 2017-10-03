@@ -7,15 +7,22 @@ This project contains the source code for the function along with packaging inst
 
 **SFTP Authentication**
 
-The function supports authentication against the remote SFTP server using a username and either a password or a private key. If authenticating using a private key file then the file should be stored in a secure S3 bucket to which the IAM role under which the function is running has read access.
+The function supports authentication against the remote SFTP server using a username and either a password or a private key. If authenticating using a private key then the key should be stored in a text file in a secure S3 bucket to which the IAM role under which the function is running has read access.
 
-**Tests**
+Configuration
+-------------
 
-There are tests in the `tests.py` file, which can be run using `pytest`:
+The following environment variables MUST be set:
 
-```shell
-$ pytest tests.py
-```
+    SSH_HOST - the host address of the destination SFTP server
+    SSH_USERNAME - the SSH account username
+    SSH_PASSWORD - the SSH account password, OR
+    SSH_PRIVATE_KEY - path to a private key file on S3, in 'bucket:key' format
+
+The following environment variables MAY be set:
+
+    SSH_PORT - the port number (defaults to 22)
+    SSH_DIR - a specific directory to upload files to
 
 Packaging and Deployment
 ------------------------
@@ -33,6 +40,8 @@ Create the new image and give it a sensible name using the `-t` option:
 ```shell
 $ docker build -t lambda-packager .
 ```
+
+You should now have a docker image called `lambda-packager` which can be used to package the function and its dependencies, as well as upload it to AWS.
 
 2. Use the image created to run the `Makefile`:
 
@@ -57,18 +66,3 @@ $ make update ARN=arn:aws:lambda:us-east-1:account-id:function:s3-to-sftp
 ```
 
 <img src="screenshots/lambda-configuration.png" />
-
-Configuration
--------------
-
-The following environment variables MUST be set:
-
-    SSH_HOST - the host address of the destination SFTP server
-    SSH_USERNAME - the SSH account username
-    SSH_PASSWORD - the SSH account password, OR
-    SSH_PRIVATE_KEY - path to a private key file on S3, in 'bucket:key' format
-
-The following environment variables MAY be set:
-
-    SSH_PORT - the port number (defaults to 22)
-    SSH_DIR - if set, the files will be uploaded to the specified directory
