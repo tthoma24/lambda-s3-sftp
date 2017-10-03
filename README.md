@@ -7,7 +7,7 @@ This project contains the source code for the function along with packaging inst
 
 **Status**
 
-The function currently uses username/password to connect to the remote SFTP, and does not support public key authentication.
+The function currently uses username/password to connect to the remote SFTP, and does not support private key authentication. Paramiko does support it, so it wouldn't be hard to add support if required.
 
 **Tests**
 
