@@ -43,26 +43,27 @@ $ docker build -t lambda-packager .
 
 You should now have a docker image called `lambda-packager` which can be used to package the function and its dependencies, as well as upload it to AWS.
 
-2. Use the image created to run the `Makefile`:
+2. Use the image created to run the `make package` command _inside_ the container (so that it run within an **amazonlinux** environment):
 
 ```shell
+# package command builds the package.zip file ready for upload to AWS
 $ docker run --rm --volume $(pwd):/lambda lambda-packager package
 ```
 
 This command will mount the current directory (`$(pwd)`) into a new container as `/lambda`, so that the container has access to `requirements.txt` and the function file (`s3_to_sftp.py`), and run the `make package` command.
 
-The `package` make command does the following, inside the container:
+The `package` command does the following, inside the container:
 
 * `pip install` the requirements into `/lambda/.dist`
 * Copy `s3_to_sftp.py` source file into `/lambda/.dist`
 * Zip up the directory into a new file called `package.zip`
 
-3. Once you have generated the `package.zip`, you can either upload it to AWS
-via the console (see screenshot below), or using the `make upload` command,
-using the function ARN:
+3. Once you have generated the `package.zip`, you can upload it to AWS using the `make update` command. As the name suggests, this will only update an existing function's code - so you'll have to create the function initially via the AWS console. Once you have done that you can use the function's 'ARN' to update it:
 
-```
+```shell
 $ make update ARN=arn:aws:lambda:us-east-1:account-id:function:s3-to-sftp
 ```
+
+Or you can just upload the `package.zip` file through the console:
 
 <img src="screenshots/lambda-configuration.png" />
