@@ -26,3 +26,6 @@ compile:
 	# compile the set of requirements from requirements.in to requirements.txt
 	# must set locale, see http://click.pocoo.org/5/python3/ for details
 	LC_ALL=en_US.utf8 pip-compile --output-file requirements.txt requirements.in
+
+update:
+	aws lambda update-function-code --function-name $(ARN) --zip-file fileb://package.zip
