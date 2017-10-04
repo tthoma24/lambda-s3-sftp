@@ -8,24 +8,31 @@
 #
 # The output from running the 'package' command is a single package.zip
 # file that contains everything required to run the Lambda function. This
-# should be uploaded to AWS.
+# should be uploaded to AWS. If you have the aws-sdk installed and configured
+# you can use `make upload` to upload package.zip directly.
 #
+
 # restore local file system to pre-packaging state
 clean:
 	rm -rf .dist/
 	rm -f package.zip
 
 package: clean
-	pip3 install -r requirements.txt -t .dist
+	# install dependencies into .dist directory
+	python3 -m pip install -r requirements.txt -t .dist
+	# copy in the .py source file(s)
 	cp *.py .dist/
+	# zip up the entire directory into package.zip
 	cd .dist; zip -r ../package.zip .
+	# tidy up
 	rm -rf .dist/
 
 # run pip-compile to re-generate the requirements.txt file
 compile:
 	# compile the set of requirements from requirements.in to requirements.txt
 	# must set locale, see http://click.pocoo.org/5/python3/ for details
-	LC_ALL=en_US.utf8 pip-compile --output-file requirements.txt requirements.in
+	python3 -m pip install pip-compile
+	pip-compile --output-file requirements.txt requirements.install
 
-update:
+upload:
 	aws lambda update-function-code --function-name $(ARN) --zip-file fileb://package.zip

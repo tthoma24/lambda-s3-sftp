@@ -1,7 +1,7 @@
 *.pem
 *.pyc
-.cache
 .dist
 .venv
+Dockerfile
 package
-package.zip
+README.md

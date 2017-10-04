@@ -58,10 +58,11 @@ The `package` command does the following, inside the container:
 * Copy `s3_to_sftp.py` source file into `/lambda/.dist`
 * Zip up the directory into a new file called `package.zip`
 
-3. Once you have generated the `package.zip`, you can upload it to AWS using the `make update` command. As the name suggests, this will only update an existing function's code - so you'll have to create the function initially via the AWS console. Once you have done that you can use the function's 'ARN' to update it:
+3. Once you have generated the `package.zip`, you can upload it to AWS using the `make upload` command. As the name suggests, this will only update an existing function's code - so you'll have to create the function initially via the AWS console. Once you have done that you can use the function's 'ARN' to update it:
 
 ```shell
-$ make update ARN=arn:aws:lambda:us-east-1:account-id:function:s3-to-sftp
+# NB you will require the aws sdk to be installed and configured for this to work
+$ make upload ARN=arn:aws:lambda:us-east-1:account-id:function:s3-to-sftp
 ```
 
 Or you can just upload the `package.zip` file through the console:
