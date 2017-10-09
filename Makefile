@@ -14,18 +14,18 @@
 
 # restore local file system to pre-packaging state
 clean:
-	rm -rf .dist/
+	rm -rf package/
 	rm -f package.zip
 
 package: clean
-	# install dependencies into .dist directory
-	python3 -m pip install -r requirements.txt -t .dist
+	# install dependencies into package directory
+	python3 -m pip install -r requirements.txt -t package
 	# copy in the .py source file(s)
-	cp *.py .dist/
+	cp *.py package/
 	# zip up the entire directory into package.zip
-	cd .dist; zip -r ../package.zip .
+	cd package; zip -r ../package.zip .
 	# tidy up
-	rm -rf .dist/
+	rm -rf package/
 
 # run pip-compile to re-generate the requirements.txt file
 compile:
