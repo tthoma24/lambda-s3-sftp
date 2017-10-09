@@ -14,8 +14,9 @@ Optional env vars
         specified directory.
 
 """
-import logging
+import datetime
 import io
+import logging
 import os
 
 import boto3
@@ -34,6 +35,7 @@ assert SSH_PASSWORD or SSH_PRIVATE_KEY, "Missing SSH_PASSWORD or SSH_PRIVATE_KEY
 # optional
 SSH_PORT = int(os.getenv('SSH_PORT', 22))
 SSH_DIR = os.getenv('SSH_DIR')
+SSH_PREFIX = os.getenv('SSH_PREFIX', 'data_')
 
 
 def on_trigger_event(event, context):
@@ -150,7 +152,7 @@ def transfer_file(sftp_client, s3_file):
         s3_file: boto3.Object representing the S3 file
 
     """
-    filename = s3_file.key.split('/')[-1]
+    filename = SSH_PREFIX + datetime.date.today().isoformat()
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
     logger.info("Transferred '%s' from S3 to SFTP", s3_file.key)
