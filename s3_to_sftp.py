@@ -1,5 +1,5 @@
 """
-AWS Lambda function for transferring files from S3 to SFTP on a PUT event.
+AWS Lambda function for transferring files from S3 to SFTP on a create event.
 
 Required env vars:
 
@@ -26,35 +26,33 @@ logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
 
 # read in shared properties on module load - will fail hard if any are missing
 SSH_HOST = os.environ['SSH_HOST']
-SSH_PORT = int(os.getenv('SSH_PORT', 22))
 SSH_USERNAME = os.environ['SSH_USERNAME']
+# must have one of pwd / key - fail hard if both are missing
 SSH_PASSWORD = os.getenv('SSH_PASSWORD')
 SSH_PRIVATE_KEY = os.getenv('SSH_PRIVATE_KEY')
-SSH_DIR = os.getenv('SSH_DIR')
-
-# fail hard on startup if no authentication mechanism exists
 assert SSH_PASSWORD or SSH_PRIVATE_KEY, "Missing SSH_PASSWORD or SSH_PRIVATE_KEY"
+# optional
+SSH_PORT = int(os.getenv('SSH_PORT', 22))
+SSH_DIR = os.getenv('SSH_DIR')
 
 
 def on_trigger_event(event, context):
     """
     Move uploaded S3 files to SFTP endpoint, then delete.
 
-    This is the Lambda entry point. It receives the event
-    payload and processes it. In this case it receives a
-    set of 'Record' dicts which should contain details of
-    an S3 file PUT. The contents of this dict can be found
-    in the tests.py::TEST_RECORD - the example comes from
+    This is the Lambda entry point. It receives the event payload and
+    processes it. In this case it receives a set of 'Record' dicts which
+    should contain details of an S3 file create event. The contents of this
+    dict can be found in the tests.py::TEST_RECORD - the example comes from
     the Lambda test event rig.
 
-    The only important information we process in this function
-    are the `eventName` which must be ObjectCreated:Put, and
-    then the bucket name and object key.
+    The only important information we process in this function are the
+    `eventName`, which must start with ObjectCreated, and then the bucket name
+    and object key.
 
-    This function then connects to the SFTP server, copies
-    the file across, and then (if successful), deletes the
-    original. This is done to prevent sensitive data from
-    hanging around - it basically only exists for as long
+    This function then connects to the SFTP server, copies the file across,
+    and then (if successful), deletes the original. This is done to prevent
+    sensitive data from hanging around - it basically only exists for as long
     as it takes Lambda to pick it up and transfer it.
 
     See http://docs.aws.amazon.com/lambda/latest/dg/python-programming-model-handler-types.html
@@ -87,7 +85,9 @@ def on_trigger_event(event, context):
                 transfer_file(sftp_client, s3_file)
                 delete_file(s3_file)
             except Exception:
+                # log and raise so that we can allow the DLQ to kick in
                 logger.exception("Error processing '%s'", s3_file.key)
+                raise
 
 
 def connect_to_sftp(hostname, port, username, password, pkey):
@@ -115,11 +115,15 @@ def get_private_key(bucket, key):
 
 def s3_files(event):
     """
-    Iterate through event and yield boto3.Object for each S3 file PUT.
+    Iterate through event and yield boto3.Object for each S3 file created.
 
     This function loops through all the records in the payload,
-    checks that the event is a file PUT, and if so, yields a
+    checks that the event is a file creation, and if so, yields a
     boto3.Object that represents the file.
+
+    NB Redshift will trigger an `ObjectCreated:CompleteMultipartUpload` event
+    will UNLOADing the data; if you select to dump a manifest file as well,
+    then this will trigger `ObjectCreated:Put`
 
     Args:
         event: dict, the payload received from the Lambda trigger.
@@ -129,7 +133,9 @@ def s3_files(event):
     for record in event['Records']:
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key']
-        if record['eventName'] == "ObjectCreated:Put":
+        event_category, event_subcat = record['eventName'].split(':')
+        if event_category == 'ObjectCreated':
+            logger.debug("Received '%s' trigger on '%s'", event_subcat, key)
             yield boto3.resource('s3').Object(bucket, key)
         else:
             logger.warning("Ignoring invalid event: %s", record)
