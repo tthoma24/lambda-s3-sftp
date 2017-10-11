@@ -48,7 +48,7 @@ def test_sftp_filename():
     assert sftp_filename('{bucket}-{key}', f) == 'foo-bar'
     # might fail if you run the test at midnight
     assert (
-        sftp_filename('{bucket}-{key}_{date}', f) ==
+        sftp_filename('{bucket}-{key}_{current_date}', f) ==
         'foo-bar_' + datetime.date.today().isoformat()
     )
 
