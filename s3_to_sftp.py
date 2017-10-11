@@ -30,11 +30,13 @@ SSH_HOST = os.environ['SSH_HOST']
 SSH_USERNAME = os.environ['SSH_USERNAME']
 # must have one of pwd / key - fail hard if both are missing
 SSH_PASSWORD = os.getenv('SSH_PASSWORD')
+# path to a private key file on S3 in 'bucket:key' format.
 SSH_PRIVATE_KEY = os.getenv('SSH_PRIVATE_KEY')
 assert SSH_PASSWORD or SSH_PRIVATE_KEY, "Missing SSH_PASSWORD or SSH_PRIVATE_KEY"
 # optional
 SSH_PORT = int(os.getenv('SSH_PORT', 22))
 SSH_DIR = os.getenv('SSH_DIR')
+# filename prefix used for the remote file
 SSH_PREFIX = os.getenv('SSH_PREFIX', 'data_')
 
 
@@ -155,7 +157,7 @@ def transfer_file(sftp_client, s3_file):
     filename = SSH_PREFIX + datetime.date.today().isoformat()
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
-    logger.info("Transferred '%s' from S3 to SFTP", s3_file.key)
+    logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)
 
 
 def delete_file(s3_file):
