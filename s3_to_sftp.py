@@ -12,6 +12,9 @@ Optional env vars
     SSH_PORT - defaults to 22
     SSH_DIR - if specified the SFTP client will transfer the files to the
         specified directory.
+    SSH_FILENAME - used as a mask for the remote filename. Supports three
+        string replacement vars - {bucket}, {key}, {current_date}. Bucket
+        and key refer to the uploaded S3 file. Current date is in ISO format.
 
 """
 import datetime
@@ -36,8 +39,8 @@ assert SSH_PASSWORD or SSH_PRIVATE_KEY, "Missing SSH_PASSWORD or SSH_PRIVATE_KEY
 # optional
 SSH_PORT = int(os.getenv('SSH_PORT', 22))
 SSH_DIR = os.getenv('SSH_DIR')
-# filename prefix used for the remote file
-SSH_PREFIX = os.getenv('SSH_PREFIX', 'data_')
+# filename mask used for the remote file
+SSH_FILENAME = os.getenv('SSH_FILENAME', 'data_{current_date}')
 
 
 def on_trigger_event(event, context):
@@ -145,6 +148,14 @@ def s3_files(event):
             logger.warning("Ignoring invalid event: %s", record)
 
 
+def sftp_filename(file_mask, s3_file):
+    return file_mask.format(
+        bucket=s3_file.bucket_name,
+        key=s3_file.key,
+        current_date=datetime.date.today().isoformat()
+    )
+
+
 def transfer_file(sftp_client, s3_file):
     """
     Transfer S3 file to SFTP server.
@@ -154,7 +165,7 @@ def transfer_file(sftp_client, s3_file):
         s3_file: boto3.Object representing the S3 file
 
     """
-    filename = SSH_PREFIX + datetime.date.today().isoformat()
+    filename = sftp_filename(SSH_FILENAME, s3_file)
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
     logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)

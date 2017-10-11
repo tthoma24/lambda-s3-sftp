@@ -41,6 +41,18 @@ TEST_RECORD = {
 }
 
 
+def test_sftp_filename():
+    f = mock.Mock(bucket_name='foo', key='bar')
+    assert sftp_filename('', f) == ''
+    assert sftp_filename('{bucket}', f) == 'foo'
+    assert sftp_filename('{bucket}-{key}', f) == 'foo-bar'
+    # might fail if you run the test at midnight
+    assert (
+        sftp_filename('{bucket}-{key}_{date}', f) ==
+        'foo-bar_' + datetime.date.today().isoformat()
+    )
+
+
 def test_s3_files():
     event = dict(Records=[TEST_RECORD.copy()])
     objs = list(s3_files(event))
