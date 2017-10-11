@@ -2,6 +2,7 @@ from unittest import mock
 from s3_to_sftp import *
 
 import paramiko
+import pytest
 
 # taken directly from the Lambda test configuration
 TEST_RECORD = {
@@ -51,8 +52,8 @@ def test_s3_files():
     assert len(event['Records']) == 2
     objs = list(s3_files(event))
     assert len(objs) == 2
-    # check that non PUT events are ignored
-    event['Records'][0]['eventName'] = 'foo'
+    # check that non ObjectCreated events are ignored
+    event['Records'][0]['eventName'] = 'ObjectRemoved:Delete'
     objs = list(s3_files(event))
     assert len(objs) == 1
 
@@ -76,6 +77,7 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_connect):
     mock_transfer.reset_mock()
     mock_delete.reset_mock()
     mock_transfer.side_effect = Exception("Error transferring file")
-    on_trigger_event(event, context)
+    with pytest.raises(Exception):
+        on_trigger_event(event, context)
     assert mock_transfer.call_count == 1
     assert mock_delete.call_count == 0

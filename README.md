@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/yunojuno/lambda-s3-sftp.svg?branch=master)](https://travis-ci.org/yunojuno/lambda-s3-sftp)
+
 S3 to SFTP Transfer Function
 ============================
 
