@@ -149,6 +149,7 @@ def s3_files(event):
 
 
 def sftp_filename(file_mask, s3_file):
+    """Create destination SFTP filename."""
     return file_mask.format(
         bucket=s3_file.bucket_name,
         key=s3_file.key,
