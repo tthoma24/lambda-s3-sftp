@@ -25,6 +25,7 @@ The following environment variables MAY be set:
 
     SSH_PORT - the port number (defaults to 22)
     SSH_DIR - a specific directory to upload files to
+    SSH_FILENAME - the name of SFTP file created - supports {{ bucket|key|current_date }} format options
 
 Packaging and Deployment
 ------------------------
