@@ -23,6 +23,7 @@ import logging
 import os
 
 import boto3
+import botocore.exceptions
 import paramiko
 
 logger = logging.getLogger()
@@ -88,13 +89,9 @@ def on_trigger_event(event, context):
     with transport:
         for s3_file in s3_files(event):
             logger.debug("Transferring '%s' from S3 to SFTP", s3_file.key)
-            try:
-                transfer_file(sftp_client, s3_file)
-                delete_file(s3_file)
-            except Exception:
-                # log and raise so that we can allow the DLQ to kick in
-                logger.exception("Error processing '%s'", s3_file.key)
-                raise
+            sftp_filename, result = transfer_file(sftp_client, s3_file)
+            archive_file(s3_file, sftp_filename, result)
+            delete_file(s3_file)
 
 
 def connect_to_sftp(hostname, port, username, password, pkey):
@@ -165,11 +162,19 @@ def transfer_file(sftp_client, s3_file):
         sftp_client: paramiko.SFTPClient, connected to SFTP endpoint
         s3_file: boto3.Object representing the S3 file
 
+    Returns a 2-tuple containing the name of the remote file as transferred,
+        and any status message to be written to the archive file.
+
     """
     filename = sftp_filename(SSH_FILENAME, s3_file)
     with sftp_client.file(filename, 'w') as sftp_file:
-        s3_file.download_fileobj(Fileobj=sftp_file)
-    logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)
+        try:
+            s3_file.download_fileobj(Fileobj=sftp_file)
+        except botocore.exceptions.BotoCoreError as ex:
+            return filename, str(ex)
+        else:
+            logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)
+            return filename, ''
 
 
 def delete_file(s3_file):
@@ -186,3 +191,25 @@ def delete_file(s3_file):
     """
     s3_file.delete()
     logger.info("Deleted '%s' from S3", s3_file.key)
+
+
+def archive_file(s3_file, sftp_filename, result):
+    """
+    Write to S3 an archive file.
+
+    The archive does **not** contain the file that was sent, as we don't
+    want the data hanging around on S3. Instead it's just an empty marker
+    that represents the file. If the transfer errored, then the archive file
+    has a '.x' suffix, and will contain the error message.
+
+    Args:
+        s3_file: boto3 Object, the S3 file object that was transferred
+        sftp_filename: string, the name of the file as transferred
+        result: string, blank if successful, else contains an error message.
+
+    """
+    archive_key = ('archive/{}.X' if result else 'archive/{}').format(sftp_filename)
+    s3 = boto3.resource('s3')
+    obj = s3.Object(s3_file.bucket_name, archive_key)
+    obj.put(Body=result)
+    logger.info("Archived '%s'", s3_file.key)
