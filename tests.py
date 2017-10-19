@@ -70,10 +70,13 @@ def test_s3_files():
     assert len(objs) == 1
 
 
+@mock.patch('s3_to_sftp.sftp_filename')
 @mock.patch('s3_to_sftp.connect_to_sftp')
+@mock.patch('s3_to_sftp.archive_file')
 @mock.patch('s3_to_sftp.transfer_file')
 @mock.patch('s3_to_sftp.delete_file')
-def test_on_trigger_event(mock_delete, mock_transfer, mock_connect):
+def test_on_trigger_event(mock_delete, mock_transfer, mock_archive,
+                          mock_connect, mock_filename):
 
     # lots of mocks to remove the paramiko SSH connection internals
     mock_client = mock.Mock(spec=paramiko.SFTPClient)
@@ -82,14 +85,29 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_connect):
 
     event = dict(Records=[TEST_RECORD.copy()])
     context = mock.Mock()
+
+    # 1. transfer works, check for archive and deletion
+    on_trigger_event(event, context)
+    assert mock_transfer.call_count == 1
+    assert mock_archive.call_count == 1
+    assert mock_delete.call_count == 1
+    mock_archive.assert_called_with(
+        'sourcebucket',
+        mock_filename.return_value,
+        ''
+    )
+
+    # 2. transfer failure, archive is called with error message
+    mock_transfer.reset_mock()
+    mock_archive.reset_mock()
+    mock_delete.reset_mock()
+    ex = botocore.exceptions.BotoCoreError()
+    mock_transfer.side_effect = botocore.exceptions.BotoCoreError()
     on_trigger_event(event, context)
     assert mock_transfer.call_count == 1
     assert mock_delete.call_count == 1
-    # check that a failure in transfer means delete is not called
-    mock_transfer.reset_mock()
-    mock_delete.reset_mock()
-    mock_transfer.side_effect = Exception("Error transferring file")
-    with pytest.raises(Exception):
-        on_trigger_event(event, context)
-    assert mock_transfer.call_count == 1
-    assert mock_delete.call_count == 0
+    mock_archive.assert_called_with(
+        'sourcebucket',
+        mock_filename.return_value + '.x',
+        str(ex)
+    )

@@ -1,6 +1,10 @@
 """
 AWS Lambda function for transferring files from S3 to SFTP on a create event.
 
+Style note: the specific S3 interactions have been split out into very simple
+one line functions - this is to make the code easier to read and test. It would
+be perfectly valid to just have a single function that runs the entire thing.
+
 Required env vars:
 
     SSH_HOSTNAME
@@ -88,10 +92,15 @@ def on_trigger_event(event, context):
 
     with transport:
         for s3_file in s3_files(event):
-            logger.debug("Transferring '%s' from S3 to SFTP", s3_file.key)
-            sftp_filename, result = transfer_file(sftp_client, s3_file)
-            archive_file(s3_file, sftp_filename, result)
-            delete_file(s3_file)
+            filename = sftp_filename(SSH_FILENAME, s3_file)
+            try:
+                transfer_file(sftp_client, s3_file, filename)
+            except botocore.exceptions.BotoCoreError as ex:
+                archive_file(s3_file.bucket_name, filename + '.x', str(ex))
+            else:
+                archive_file(s3_file.bucket_name, filename, '')
+            finally:
+                delete_file(s3_file)
 
 
 def connect_to_sftp(hostname, port, username, password, pkey):
@@ -153,27 +162,22 @@ def sftp_filename(file_mask, s3_file):
     )
 
 
-def transfer_file(sftp_client, s3_file):
+def transfer_file(sftp_client, s3_file, filename):
     """
     Transfer S3 file to SFTP server.
 
     Args:
         sftp_client: paramiko.SFTPClient, connected to SFTP endpoint
         s3_file: boto3.Object representing the S3 file
+        filename: string, the remote filename to use
 
     Returns a 2-tuple containing the name of the remote file as transferred,
         and any status message to be written to the archive file.
 
     """
-    filename = sftp_filename(SSH_FILENAME, s3_file)
     with sftp_client.file(filename, 'w') as sftp_file:
-        try:
-            s3_file.download_fileobj(Fileobj=sftp_file)
-        except botocore.exceptions.BotoCoreError as ex:
-            return filename, str(ex)
-        else:
-            logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)
-            return filename, ''
+        s3_file.download_fileobj(Fileobj=sftp_file)
+    logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)
 
 
 def delete_file(s3_file):
@@ -192,7 +196,7 @@ def delete_file(s3_file):
     logger.info("Deleted '%s' from S3", s3_file.key)
 
 
-def archive_file(s3_file, sftp_filename, result):
+def archive_file(bucket, filename, contents):
     """
     Write to S3 an archive file.
 
@@ -202,13 +206,12 @@ def archive_file(s3_file, sftp_filename, result):
     has a '.x' suffix, and will contain the error message.
 
     Args:
-        s3_file: boto3 Object, the S3 file object that was transferred
-        sftp_filename: string, the name of the file as transferred
-        result: string, blank if successful, else contains an error message.
+        bucket: string, S3 bucket name
+        filename: string, the name of the archive file
+        contents: string, the contents of the archive file - blank unless there
+            was an exception, in which case the exception message.
 
     """
-    archive_key = ('archive/{}.X' if result else 'archive/{}').format(sftp_filename)
-    s3 = boto3.resource('s3')
-    obj = s3.Object(s3_file.bucket_name, archive_key)
-    obj.put(Body=result)
-    logger.info("Archived '%s'", s3_file.key)
+    key = 'archive/{}'.format(filename)
+    boto3.resource('s3').Object(bucket, key).put(Body=contents)
+    logger.info("Archived '%s'", key)
