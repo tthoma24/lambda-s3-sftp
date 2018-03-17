@@ -70,13 +70,14 @@ def test_s3_files():
     assert len(objs) == 1
 
 
+@mock.patch('s3_to_sftp.get_row_count')
 @mock.patch('s3_to_sftp.sftp_filename')
 @mock.patch('s3_to_sftp.connect_to_sftp')
 @mock.patch('s3_to_sftp.archive_file')
 @mock.patch('s3_to_sftp.transfer_file')
 @mock.patch('s3_to_sftp.delete_file')
 def test_on_trigger_event(mock_delete, mock_transfer, mock_archive,
-                          mock_connect, mock_filename):
+                          mock_connect, mock_filename, mock_row_count):
 
     # lots of mocks to remove the paramiko SSH connection internals
     mock_client = mock.Mock(spec=paramiko.SFTPClient)
@@ -92,9 +93,9 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_archive,
     assert mock_archive.call_count == 1
     assert mock_delete.call_count == 1
     mock_archive.assert_called_with(
-        'sourcebucket',
-        mock_filename.return_value,
-        ''
+        bucket='sourcebucket',
+        filename=mock_filename.return_value,
+        contents=mock_row_count.return_value
     )
 
     # 2. transfer failure, archive is called with error message
@@ -107,7 +108,7 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_archive,
     assert mock_transfer.call_count == 1
     assert mock_delete.call_count == 1
     mock_archive.assert_called_with(
-        'sourcebucket',
-        mock_filename.return_value + '.x',
-        str(ex)
+        bucket='sourcebucket',
+        filename=mock_filename.return_value + '.x',
+        contents=str(ex)
     )
