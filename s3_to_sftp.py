@@ -156,10 +156,10 @@ def s3_files(event):
         key = record['s3']['object']['key']
         event_category, event_subcat = record['eventName'].split(':')
         if event_category == 'ObjectCreated':
-            logger.debug("Received '%s' trigger on '%s'", event_subcat, key)
+            logger.info(f"Received '{ event_subcat }' trigger on '{ key }'")
             yield boto3.resource('s3').Object(bucket, key)
         else:
-            logger.warning("Ignoring invalid event: %s", record)
+            logger.warning(f"Ignoring invalid event: { record }")
 
 
 def sftp_filename(file_mask, s3_file):
@@ -184,7 +184,9 @@ def get_row_count(file_obj):
         logger.exception("Error reading row count.")
         return -1
     else:
-        return body.count('\n')
+        row_count = body.count('\n')
+        logger.info(f"Row count: { row_count }")
+        return row_count
 
 
 def transfer_file(sftp_client, s3_file, filename):
@@ -202,7 +204,7 @@ def transfer_file(sftp_client, s3_file, filename):
     """
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
-    logger.info("Transferred '%s' from S3 to SFTP as '%s'", s3_file.key, filename)
+    logger.info(f"Transferred '{ s3_file.key }' from S3 to SFTP as '{ filename }'")
 
 
 def delete_file(s3_file):
@@ -218,7 +220,7 @@ def delete_file(s3_file):
 
     """
     s3_file.delete()
-    logger.info("Deleted '%s' from S3", s3_file.key)
+    logger.info(f"Deleted '{ s3_file.key }' from S3")
 
 
 def archive_file(*, bucket, filename, contents):
@@ -239,4 +241,4 @@ def archive_file(*, bucket, filename, contents):
     """
     key = 'archive/{}'.format(filename)
     boto3.resource('s3').Object(bucket, key).put(Body=contents)
-    logger.info("Archived '%s'", key)
+    logger.info(f"Archived '{ key }'")
