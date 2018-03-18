@@ -95,7 +95,7 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_archive,
     mock_archive.assert_called_with(
         bucket='sourcebucket',
         filename=mock_filename.return_value,
-        contents=mock_row_count.return_value
+        contents=str(mock_row_count.return_value)
     )
 
     # 2. transfer failure, archive is called with error message

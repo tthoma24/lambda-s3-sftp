@@ -105,7 +105,7 @@ def on_trigger_event(event, context):
                 archive_file(
                     bucket=s3_file.bucket_name,
                     filename=filename,
-                    contents=get_row_count(s3_file)
+                    contents=str(get_row_count(s3_file))
                 )
             finally:
                 delete_file(s3_file)
@@ -172,14 +172,15 @@ def sftp_filename(file_mask, s3_file):
 
 
 def get_row_count(file_obj):
-    """Return the number of rows in the CSV.
+    """Return the number of rows (as text) in the CSV.
 
-    Calculated by the number of '\n' in the file.
+    Calculated by the number of '\n' in the file. It returns a value
+    of -1 if there was an error calculating the row count.
 
     """
     try:
-        body = file_obj['Body'].read().decode('utf-8')
-    except Exception:
+        body = file_obj.get()['Body'].read().decode('utf-8')
+    except Exception as ex:
         logger.exception("Error reading row count.")
         return -1
     else:
