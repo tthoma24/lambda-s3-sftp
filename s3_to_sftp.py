@@ -96,26 +96,18 @@ def on_trigger_event(event, context):
     with transport:
         for s3_file in s3_files(event):
             filename = sftp_filename(SSH_FILENAME, s3_file)
+            bucket = s3_file.bucket_name
+            contents = ''
             try:
                 logger.info(f"S3-SFTP: Transferring S3 file '{s3_file.key}'")
                 transfer_file(sftp_client, s3_file, filename)
             except botocore.exceptions.BotoCoreError as ex:
                 logger.exception(f"S3-SFTP: Error transferring S3 file '{s3_file.key}'.")
-                logger.info(f"S3-SFTP: Archiving file '{s3_file.key}'.")
-                archive_file(
-                    bucket=s3_file.bucket_name,
-                    filename=filename + '.x',
-                    contents=str(ex)
-                )
+                contents = str(ex)
+                filename = filename + '.x'
             else:
                 logger.info(f"S3-SFTP: Archiving S3 file '{s3_file.key}'.")
-                row_count = get_row_count(s3_file)
-                archive_file(
-                    bucket=s3_file.bucket_name,
-                    filename=filename,
-                    contents=str(row_count)
-                )
-            finally:
+                archive_file(bucket=bucket, filename=filename, contents=contents)
                 logger.info(f"S3-SFTP: Deleting S3 file '{s3_file.key}'.")
                 delete_file(s3_file)
 
@@ -180,24 +172,6 @@ def sftp_filename(file_mask, s3_file):
     )
 
 
-def get_row_count(file_obj):
-    """Return the number of rows (as text) in the CSV.
-
-    Calculated by the number of '\n' in the file. It returns a value
-    of -1 if there was an error calculating the row count.
-
-    """
-    try:
-        body = file_obj.get()['Body'].read().decode('utf-8')
-        row_count = body.count('\n')
-    except Exception as ex:
-        logger.exception(f"S3-SFTP: Error reading row count.")
-        return -1
-    else:
-        logger.info(f"S3-SFTP: Row count: { row_count }")
-        return row_count
-
-
 def transfer_file(sftp_client, s3_file, filename):
     """
     Transfer S3 file to SFTP server.
@@ -228,8 +202,12 @@ def delete_file(s3_file):
         s3_file: boto3.Object representing the S3 file
 
     """
-    s3_file.delete()
-    logger.info(f"S3-SFTP: Deleted '{ s3_file.key }' from S3")
+    try:
+        s3_file.delete()
+    except botocore.exceptions.BotoCoreError as ex:
+        logger.exception(f"S3-SFTP: Error deleting '{ s3_file.key }' from S3.")
+    else:
+        logger.info(f"S3-SFTP: Deleted '{ s3_file.key }' from S3")
 
 
 def archive_file(*, bucket, filename, contents):
@@ -249,5 +227,9 @@ def archive_file(*, bucket, filename, contents):
 
     """
     key = 'archive/{}'.format(filename)
-    boto3.resource('s3').Object(bucket, key).put(Body=contents)
-    logger.info(f"S3-SFTP: Archived '{ filename }' as '{ key }'")
+    try:
+        boto3.resource('s3').Object(bucket, key).put(Body=contents)
+    except botocore.exceptions.BotoCoreError as ex:
+        logger.exception(f"S3-SFTP: Error archiving '{ filename }' as '{ key }'.")
+    else:
+        logger.info(f"S3-SFTP: Archived '{ filename }' as '{ key }'.")
