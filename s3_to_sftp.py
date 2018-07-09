@@ -79,6 +79,9 @@ def on_trigger_event(event, context):
     else:
         key_obj = None
 
+    # prefix all logging statements - otherwise impossible to filter out in Cloudwatch
+    logger.debug(f"S3-SFTP: received event\n{event}")
+
     sftp_client, transport = connect_to_sftp(
         hostname=SSH_HOST,
         port=SSH_PORT,
@@ -88,7 +91,7 @@ def on_trigger_event(event, context):
     )
     if SSH_DIR:
         sftp_client.chdir(SSH_DIR)
-        logger.debug("Switched into remote SFTP upload directory")
+        logger.debug("S3-SFTP: Switched into remote SFTP upload directory")
 
     with transport:
         for s3_file in s3_files(event):
@@ -116,7 +119,7 @@ def connect_to_sftp(hostname, port, username, password, pkey):
     transport = paramiko.Transport((hostname, port))
     transport.connect(username=username, password=password, pkey=pkey)
     client = paramiko.SFTPClient.from_transport(transport)
-    logger.debug("Connected to remote SFTP server")
+    logger.debug("S3-SFTP: Connected to remote SFTP server")
     return client, transport
 
 
@@ -130,7 +133,7 @@ def get_private_key(bucket, key):
     key_obj = boto3.resource('s3').Object(bucket, key)
     key_str = key_obj.get()['Body'].read().decode('utf-8')
     key = paramiko.RSAKey.from_private_key(io.StringIO(key_str))
-    logger.debug("Retrieved private key from S3")
+    logger.debug("S3-SFTP: Retrieved private key from S3")
     return key
 
 
@@ -156,10 +159,10 @@ def s3_files(event):
         key = record['s3']['object']['key']
         event_category, event_subcat = record['eventName'].split(':')
         if event_category == 'ObjectCreated':
-            logger.info(f"Received '{ event_subcat }' trigger on '{ key }'")
+            logger.info(f"S3-SFTP: Received '{ event_subcat }' trigger on '{ key }'")
             yield boto3.resource('s3').Object(bucket, key)
         else:
-            logger.warning(f"Ignoring invalid event: { record }")
+            logger.warning(f"S3-SFTP: Ignoring invalid event: { record }")
 
 
 def sftp_filename(file_mask, s3_file):
@@ -181,11 +184,11 @@ def get_row_count(file_obj):
     try:
         body = file_obj.get()['Body'].read().decode('utf-8')
     except Exception as ex:
-        logger.exception("Error reading row count.")
+        logger.exception("S3-SFTP: Error reading row count.")
         return -1
     else:
         row_count = body.count('\n')
-        logger.info(f"Row count: { row_count }")
+        logger.info(f"S3-SFTP: Row count: { row_count }")
         return row_count
 
 
@@ -202,9 +205,10 @@ def transfer_file(sftp_client, s3_file, filename):
         and any status message to be written to the archive file.
 
     """
+    logger.info(f"S3-SFTP: Transferring '{ s3_file.key }' from S3 to SFTP as '{ filename }'")
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
-    logger.info(f"Transferred '{ s3_file.key }' from S3 to SFTP as '{ filename }'")
+    logger.info(f"S3-SFTP: Transferred '{ s3_file.key }' from S3 to SFTP as '{ filename }'")
 
 
 def delete_file(s3_file):
@@ -219,8 +223,9 @@ def delete_file(s3_file):
         s3_file: boto3.Object representing the S3 file
 
     """
+    logger.info(f"S3-SFTP: Deleting '{ s3_file.key }' from S3")
     s3_file.delete()
-    logger.info(f"Deleted '{ s3_file.key }' from S3")
+    logger.info(f"S3-SFTP: Deleted '{ s3_file.key }' from S3")
 
 
 def archive_file(*, bucket, filename, contents):
@@ -240,5 +245,6 @@ def archive_file(*, bucket, filename, contents):
 
     """
     key = 'archive/{}'.format(filename)
+    logger.info(f"S3-SFTP: Archiving '{ key }'")
     boto3.resource('s3').Object(bucket, key).put(Body=contents)
-    logger.info(f"Archived '{ key }'")
+    logger.info(f"S3-SFTP: Archived '{ key }'")

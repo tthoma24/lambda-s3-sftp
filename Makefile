@@ -31,8 +31,8 @@ package: clean
 compile:
 	# compile the set of requirements from requirements.in to requirements.txt
 	# must set locale, see http://click.pocoo.org/5/python3/ for details
-	python3 -m pip install pip-compile
-	pip-compile --output-file requirements.txt requirements.install
+	python3 -m pip install -U pip pip-tools
+	pip-compile --output-file requirements.txt requirements.in
 
 upload:
 	aws lambda update-function-code --function-name $(ARN) --zip-file fileb://package.zip
