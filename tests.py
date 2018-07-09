@@ -105,9 +105,9 @@ def test_on_trigger_event(mock_delete, mock_transfer, mock_archive,
     mock_transfer.side_effect = botocore.exceptions.BotoCoreError()
     on_trigger_event(event, context)
     assert mock_transfer.call_count == 1
-    assert mock_delete.call_count == 1
     mock_archive.assert_called_with(
         bucket='sourcebucket',
         filename=mock_filename.return_value + '.x',
         contents=str(ex)
     )
+    assert mock_delete.call_count == 1

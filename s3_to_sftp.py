@@ -105,11 +105,10 @@ def on_trigger_event(event, context):
                 logger.exception(f"S3-SFTP: Error transferring S3 file '{s3_file.key}'.")
                 contents = str(ex)
                 filename = filename + '.x'
-            else:
-                logger.info(f"S3-SFTP: Archiving S3 file '{s3_file.key}'.")
-                archive_file(bucket=bucket, filename=filename, contents=contents)
-                logger.info(f"S3-SFTP: Deleting S3 file '{s3_file.key}'.")
-                delete_file(s3_file)
+            logger.info(f"S3-SFTP: Archiving S3 file '{s3_file.key}'.")
+            archive_file(bucket=bucket, filename=filename, contents=contents)
+            logger.info(f"S3-SFTP: Deleting S3 file '{s3_file.key}'.")
+            delete_file(s3_file)
 
 
 def connect_to_sftp(hostname, port, username, password, pkey):
