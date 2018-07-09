@@ -80,7 +80,7 @@ def on_trigger_event(event, context):
         key_obj = None
 
     # prefix all logging statements - otherwise impossible to filter out in Cloudwatch
-    logger.debug(f"S3-SFTP: received event\n{event}")
+    logger.info(f"S3-SFTP: received trigger event")
 
     sftp_client, transport = connect_to_sftp(
         hostname=SSH_HOST,
@@ -91,26 +91,32 @@ def on_trigger_event(event, context):
     )
     if SSH_DIR:
         sftp_client.chdir(SSH_DIR)
-        logger.debug("S3-SFTP: Switched into remote SFTP upload directory")
+        logger.debug(f"S3-SFTP: Switched into remote SFTP upload directory")
 
     with transport:
         for s3_file in s3_files(event):
             filename = sftp_filename(SSH_FILENAME, s3_file)
             try:
+                logger.info(f"S3-SFTP: Transferring S3 file '{s3_file.key}'")
                 transfer_file(sftp_client, s3_file, filename)
             except botocore.exceptions.BotoCoreError as ex:
+                logger.exception(f"S3-SFTP: Error transferring S3 file '{s3_file.key}'.")
+                logger.info(f"S3-SFTP: Archiving file '{s3_file.key}'.")
                 archive_file(
                     bucket=s3_file.bucket_name,
                     filename=filename + '.x',
                     contents=str(ex)
                 )
             else:
+                logger.info(f"S3-SFTP: Archiving S3 file '{s3_file.key}'.")
+                row_count = get_row_count(s3_file)
                 archive_file(
                     bucket=s3_file.bucket_name,
                     filename=filename,
-                    contents=str(get_row_count(s3_file))
+                    contents=str(row_count)
                 )
             finally:
+                logger.info(f"S3-SFTP: Deleting S3 file '{s3_file.key}'.")
                 delete_file(s3_file)
 
 
@@ -119,7 +125,7 @@ def connect_to_sftp(hostname, port, username, password, pkey):
     transport = paramiko.Transport((hostname, port))
     transport.connect(username=username, password=password, pkey=pkey)
     client = paramiko.SFTPClient.from_transport(transport)
-    logger.debug("S3-SFTP: Connected to remote SFTP server")
+    logger.debug(f"S3-SFTP: Connected to remote SFTP server")
     return client, transport
 
 
@@ -133,7 +139,7 @@ def get_private_key(bucket, key):
     key_obj = boto3.resource('s3').Object(bucket, key)
     key_str = key_obj.get()['Body'].read().decode('utf-8')
     key = paramiko.RSAKey.from_private_key(io.StringIO(key_str))
-    logger.debug("S3-SFTP: Retrieved private key from S3")
+    logger.debug(f"S3-SFTP: Retrieved private key from S3")
     return key
 
 
@@ -183,11 +189,11 @@ def get_row_count(file_obj):
     """
     try:
         body = file_obj.get()['Body'].read().decode('utf-8')
+        row_count = body.count('\n')
     except Exception as ex:
-        logger.exception("S3-SFTP: Error reading row count.")
+        logger.exception(f"S3-SFTP: Error reading row count.")
         return -1
     else:
-        row_count = body.count('\n')
         logger.info(f"S3-SFTP: Row count: { row_count }")
         return row_count
 
@@ -205,7 +211,6 @@ def transfer_file(sftp_client, s3_file, filename):
         and any status message to be written to the archive file.
 
     """
-    logger.info(f"S3-SFTP: Transferring '{ s3_file.key }' from S3 to SFTP as '{ filename }'")
     with sftp_client.file(filename, 'w') as sftp_file:
         s3_file.download_fileobj(Fileobj=sftp_file)
     logger.info(f"S3-SFTP: Transferred '{ s3_file.key }' from S3 to SFTP as '{ filename }'")
@@ -223,7 +228,6 @@ def delete_file(s3_file):
         s3_file: boto3.Object representing the S3 file
 
     """
-    logger.info(f"S3-SFTP: Deleting '{ s3_file.key }' from S3")
     s3_file.delete()
     logger.info(f"S3-SFTP: Deleted '{ s3_file.key }' from S3")
 
@@ -245,6 +249,5 @@ def archive_file(*, bucket, filename, contents):
 
     """
     key = 'archive/{}'.format(filename)
-    logger.info(f"S3-SFTP: Archiving '{ key }'")
     boto3.resource('s3').Object(bucket, key).put(Body=contents)
-    logger.info(f"S3-SFTP: Archived '{ key }'")
+    logger.info(f"S3-SFTP: Archived '{ filename }' as '{ key }'")
