@@ -79,7 +79,8 @@ def on_trigger_event(event, context):
     else:
         key_obj = None
 
-    # prefix all logging statements - otherwise impossible to filter out in Cloudwatch
+    # prefix all logging statements - otherwise impossible to filter out in
+    # Cloudwatch
     logger.info(f"S3-SFTP: received trigger event")
 
     sftp_client, transport = connect_to_sftp(
@@ -166,7 +167,7 @@ def sftp_filename(file_mask, s3_file):
     """Create destination SFTP filename."""
     return file_mask.format(
         bucket=s3_file.bucket_name,
-        key=s3_file.key,
+        key=s3_file.key.replace("_000", ""),
         current_date=datetime.date.today().isoformat()
     )
 
