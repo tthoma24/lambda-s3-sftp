@@ -1,4 +1,4 @@
-FROM amazonlinux:latest
+FROM amazonlinux:1
 LABEL maintainer "YunoJuno <code@yunojuno.com>"
 
 # Install python3.6
