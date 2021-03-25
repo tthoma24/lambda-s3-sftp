@@ -98,7 +98,6 @@ def on_trigger_event(event, context):
     with transport:
         files_to_zip = []
         zipfilename = "debug.zip"
-        logger.info(f"S3-SFTP: Zipping S3 file '{s3_file.key}'")
         for s3_file in s3_files(event):
             filename = sftp_filename(SSH_FILENAME, s3_file)
             bucket = s3_file.bucket_name
