@@ -103,7 +103,7 @@ def on_trigger_event(event, context):
             bucket = s3_file.bucket_name
             contents = ''
             logger.info(f"S3-SFTP: Zipping S3 file '{s3_file.key}'")
-            files_to_zip.append(str(i[filename]))
+            files_to_zip.append(str(filename))
             with ZipFile(new_zip, 'w',  compression=ZIP_DEFLATED, allowZip64=True) as new_zip:
                 for file in files_to_zip:
                     new_zip.write(file)
