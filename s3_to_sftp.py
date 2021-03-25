@@ -105,7 +105,7 @@ def on_trigger_event(event, context):
             new_zip = ''
             logger.info(f"S3-SFTP: Zipping S3 file '{s3_file.key}'")
             files_to_zip.append(str(filename))
-            with ZipFile('/tmp/zipfilename', 'w',  compression=ZIP_DEFLATED, allowZip64=True) as new_zip:
+            with ZipFile('/tmp/%s' % zipfilename, 'w',  compression=ZIP_DEFLATED, allowZip64=True) as new_zip:
                 for file in files_to_zip:
                     new_zip.write(file)
         try:
