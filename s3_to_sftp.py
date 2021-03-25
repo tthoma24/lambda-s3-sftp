@@ -29,6 +29,7 @@ import os
 import boto3
 import botocore.exceptions
 import paramiko
+from zipfile import ZipFile, ZIP_DEFLATED
 
 logger = logging.getLogger()
 logger.setLevel(os.getenv('LOGGING_LEVEL', 'DEBUG'))
@@ -95,21 +96,31 @@ def on_trigger_event(event, context):
         logger.debug(f"S3-SFTP: Switched into remote SFTP upload directory")
 
     with transport:
+        files_to_zip = []
+        zipfilename = "debug.zip"
+        logger.info(f"S3-SFTP: Zipping S3 file '{s3_file.key}'")
         for s3_file in s3_files(event):
             filename = sftp_filename(SSH_FILENAME, s3_file)
             bucket = s3_file.bucket_name
             contents = ''
-            try:
-                logger.info(f"S3-SFTP: Transferring S3 file '{s3_file.key}'")
-                transfer_file(sftp_client, s3_file, filename)
-            except botocore.exceptions.BotoCoreError as ex:
-                logger.exception(f"S3-SFTP: Error transferring S3 file '{s3_file.key}'.")
-                contents = str(ex)
-                filename = filename + '.x'
-            logger.info(f"S3-SFTP: Archiving S3 file '{s3_file.key}'.")
-            archive_file(bucket=bucket, filename=filename, contents=contents)
-            logger.info(f"S3-SFTP: Deleting S3 file '{s3_file.key}'.")
-            delete_file(s3_file)
+            logger.info(f"S3-SFTP: Zipping S3 file '{s3_file.key}'")
+            files_to_zip.append(str(i[filename]))
+            with ZipFile(new_zip, 'w',  compression=ZIP_DEFLATED, allowZip64=True) as new_zip:
+                for file in files_to_zip:
+                    new_zip.write(file)
+        try:
+            logger.info(f"S3-SFTP: Transferring ZIP file '{zipfilename}'")
+            transfer_file(sftp_client, ZipFile.new_zip, zipfilename)
+        except botocore.exceptions.BotoCoreError as ex:
+            logger.exception(f"S3-SFTP: Error transferring ZIP file '{zipfilename}'.")
+#            contents = str(ex)
+#            filename = filename + '.x'
+#        logger.info(f"S3-SFTP: Archiving S3 file '{s3_file.key}'.")
+#        archive_file(bucket=bucket, filename=filename, contents=contents)
+#        logger.info(f"S3-SFTP: Archiving ZIP file '{s3_file.key}'.")
+#        archive_file(bucket=bucket, filename=filename, contents=contents)
+#        logger.info(f"S3-SFTP: Deleting S3 file '{s3_file.key}'.")
+#        delete_file(s3_file)
 
 
 def connect_to_sftp(hostname, port, username, password, pkey):
